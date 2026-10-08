@@ -85,9 +85,35 @@ runs:
             --config=fast \
             "${PAGE_SIZE_FLAGS[@]}" \
             --disk_cache=/home/runner/.cache/bazel \
-            //common:kernel_aarch64/Image
+            //common:kernel_aarch64
         fi
 
+    - name: Save Kernel ABI Symbols
+      shell: bash
+      working-directory: ${{ github.workspace }}/kernel
+      run: |
+        set -euo pipefail
+        mkdir -p "${{ github.workspace }}/abi-debug"
+
+        SYMVERS="$(find -L bazel-bin/common -maxdepth 8 -type f -name '*Module.symvers' -print -quit 2>/dev/null || true)"
+
+        if [ -n "$SYMVERS" ] && [ -f "$SYMVERS" ]; then
+          cp "$SYMVERS" "${{ github.workspace }}/abi-debug/Module.symvers"
+          echo "Found: $SYMVERS"
+        else
+          echo "::warning::Module.symvers not found"
+        fi
+
+    - name: Upload Kernel ABI Symbols
+      uses: actions/upload-artifact@v4
+      with:
+        
+        name: Kernel-ABI-${{ github.run_id }}-${{ github.job }}-${{ strategy.job-index }}-${{ inputs.version }}-${{ inputs.page_size }}
+
+        path: ${{ github.workspace }}/abi-debug/Module.symvers
+        if-no-files-found: warn
+
+    
     - name: 'Verify Page Size in Generated .config'
       shell: bash
       working-directory: ${{ github.workspace }}/kernel
